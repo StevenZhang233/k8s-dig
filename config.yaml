@@ -1,0 +1,105 @@
+# K8s Diagnostic Agent Configuration
+
+# ==================== LLM 配置 ====================
+llm:
+  provider: google_genai  # 切换为Google Gemini
+  model: gemini-1.5-pro
+  api_key: ${GOOGLE_API_KEY}
+  temperature: 0.1
+  max_tokens: 4096
+
+# ==================== 多环境 K8s 配置 ====================
+# 支持多个私有云环境，每个环境有独立的代号和master IP
+environments:
+  # 默认环境
+  default: env-dev
+  
+  # 环境列表
+  clusters:
+    - name: env-dev
+      display_name: 开发环境
+      master_ip: 10.0.1.100
+      kubeconfig: ~/.kube/config-dev
+      description: 开发测试环境
+      
+    - name: env-staging
+      display_name: 预发布环境
+      master_ip: 10.0.2.100
+      kubeconfig: ~/.kube/config-staging
+      description: 预发布验证环境
+      
+    - name: env-prod
+      display_name: 生产环境
+      master_ip: 10.0.3.100
+      kubeconfig: ~/.kube/config-prod
+      description: 生产环境（请谨慎操作）
+
+# ==================== 安全配置 ====================
+security:
+  # 允许访问的namespace列表（白名单）
+  # 留空表示允许所有（除了黑名单）
+  allowed_namespaces: []
+  
+  # 禁止访问的namespace（黑名单优先）
+  blocked_namespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+  
+  # 需要人工确认的操作
+  require_confirmation:
+    - restart_pod
+    - delete_job
+    - scale_deployment
+  
+  # exec命令白名单
+  allowed_exec_commands:
+    - env
+    - ps
+    - cat
+    - ls
+    - df
+    - free
+    - netstat
+    - ping
+    - nslookup
+    - curl
+    - wget
+    - top
+    - printenv
+    - whoami
+    - hostname
+
+# ==================== Agent 配置 ====================
+agent:
+  # 最大诊断轮数
+  max_iterations: 10
+  # 每轮最大工具调用次数
+  max_tools_per_iteration: 5
+  # 详细日志
+  verbose: true
+  # 使用的MCP服务器列表
+  mcp_servers:
+    - name: k8s-custom
+      type: builtin
+      description: 自定义K8s诊断工具
+    - name: mcp-k8s-go
+      type: external
+      command: npx @strowk/mcp-k8s
+      description: 开源K8s MCP (可选)
+      enabled: false  # 按需启用
+
+# ==================== Web GUI 配置 ====================
+web:
+  host: 0.0.0.0
+  port: 7860
+  share: false  # 是否生成公网分享链接
+  auth:
+    enabled: false
+    username: admin
+    password: ${WEB_PASSWORD}
+
+# ==================== 审计日志 ====================
+audit:
+  enabled: true
+  log_path: ./logs/audit.log

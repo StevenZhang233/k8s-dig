@@ -1,0 +1,22 @@
+# MCP
+mcp>=1.0.0
+
+# LangChain + LangGraph
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-google-genai>=2.0.0  # 新增: Gemini支持
+langgraph>=0.2.0
+
+# K8s
+kubernetes>=28.1.0
+
+# Config
+pyyaml>=6.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# Web GUI
+gradio>=4.0.0
+
+# Utilities
+rich>=13.0.0

@@ -1,0 +1,278 @@
+# K8s 诊断技能配置
+version: "1.0"
+name: K8s诊断技能集
+description: 用于诊断K8s集群中部署失败问题的技能集
+
+# ==================== 查询类技能 ====================
+skills:
+  # ---------- Pod 相关 ----------
+  - id: list_pods
+    name: 列出Pod
+    description: 获取指定namespace下所有Pod的状态，用于发现问题Pod
+    category: query
+    mcp_tool: list_pods
+    params:
+      - name: namespace
+        type: string
+        required: true
+        description: K8s namespace名称
+    safe: true
+    example: "列出product-a下的所有Pod"
+
+  - id: describe_pod
+    name: Pod详情
+    description: 获取Pod的详细描述，包括事件、状态、容器信息
+    category: query
+    mcp_tool: describe_pod
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+    safe: true
+    example: "查看api-server-xxx的详细信息"
+
+  - id: get_pod_yaml
+    name: Pod YAML
+    description: 获取Pod的完整YAML定义
+    category: query
+    mcp_tool: get_pod_yaml
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+    safe: true
+
+  # ---------- 日志相关 ----------
+  - id: get_pod_logs
+    name: Pod日志
+    description: 获取Pod的日志输出，用于排查应用层错误
+    category: logs
+    mcp_tool: get_pod_logs
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+      - name: tail_lines
+        type: integer
+        default: 100
+        description: 获取最近N行日志
+      - name: container
+        type: string
+        required: false
+        description: 多容器Pod时指定容器名
+    safe: true
+    example: "获取worker-xxx最近100行日志"
+
+  - id: get_previous_logs
+    name: 崩溃前日志
+    description: 获取Pod崩溃前的日志，用于排查CrashLoopBackOff
+    category: logs
+    mcp_tool: get_previous_logs
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+      - name: container
+        type: string
+        required: false
+    safe: true
+    example: "获取崩溃Pod的上一次运行日志"
+
+  # ---------- 事件相关 ----------
+  - id: get_events
+    name: 获取事件
+    description: 获取namespace下的K8s事件，用于排查调度、拉镜像等问题
+    category: query
+    mcp_tool: get_events
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: field_selector
+        type: string
+        required: false
+        description: 事件过滤条件
+    safe: true
+    example: "查看product-a的事件"
+
+  - id: get_pod_events
+    name: Pod事件
+    description: 获取特定Pod相关的事件
+    category: query
+    mcp_tool: get_pod_events
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+    safe: true
+
+  # ---------- Job相关（用于dbsql等）----------
+  - id: list_jobs
+    name: 列出Job
+    description: 获取namespace下所有Job的状态
+    category: query
+    mcp_tool: list_jobs
+    params:
+      - name: namespace
+        type: string
+        required: true
+    safe: true
+
+  - id: describe_job
+    name: Job详情
+    description: 获取Job的详细信息
+    category: query
+    mcp_tool: describe_job
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: job_name
+        type: string
+        required: true
+    safe: true
+
+  - id: get_job_logs
+    name: Job日志
+    description: 获取Job的执行日志
+    category: logs
+    mcp_tool: get_job_logs
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: job_name
+        type: string
+        required: true
+    safe: true
+
+  # ---------- 调试相关 ----------
+  - id: exec_in_pod
+    name: Pod内执行命令
+    description: 在Pod内执行诊断命令（仅限白名单命令）
+    category: debug
+    mcp_tool: exec_in_pod
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+      - name: command
+        type: string
+        required: true
+        description: 要执行的诊断命令
+      - name: container
+        type: string
+        required: false
+    safe: false
+    requires_whitelist_check: true
+    example: "在Pod内执行 env 查看环境变量"
+
+  # ---------- 资源查看 ----------
+  - id: get_configmap
+    name: 获取ConfigMap
+    description: 获取ConfigMap的内容
+    category: query
+    mcp_tool: get_configmap
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: name
+        type: string
+        required: true
+    safe: true
+
+  - id: get_deployment
+    name: Deployment详情
+    description: 获取Deployment的详细信息
+    category: query
+    mcp_tool: get_deployment
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: name
+        type: string
+        required: true
+    safe: true
+
+  # ---------- 操作类 ----------
+  - id: restart_pod
+    name: 重启Pod
+    description: 删除Pod触发Deployment重建（Pod会自动重建）
+    category: action
+    mcp_tool: restart_pod
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: pod_name
+        type: string
+        required: true
+    safe: true
+    requires_confirmation: true
+    danger_level: low
+    example: "重启worker-xxx使其重新初始化"
+
+  - id: delete_job
+    name: 删除Job
+    description: 删除失败的Job（配合CronJob或手动重新创建可实现重试）
+    category: action
+    mcp_tool: delete_job
+    params:
+      - name: namespace
+        type: string
+        required: true
+      - name: job_name
+        type: string
+        required: true
+    safe: false
+    requires_confirmation: true
+    danger_level: medium
+
+# ==================== 诊断策略 ====================
+diagnostic_strategies:
+  - name: CrashLoopBackOff诊断
+    trigger: "Pod状态为CrashLoopBackOff"
+    steps:
+      - get_previous_logs
+      - describe_pod
+      - get_pod_events
+    
+  - name: Pending诊断
+    trigger: "Pod状态为Pending"
+    steps:
+      - describe_pod
+      - get_events
+      - check_node_resources
+
+  - name: ImagePullBackOff诊断
+    trigger: "Pod状态为ImagePullBackOff"
+    steps:
+      - describe_pod
+      - get_pod_events
+
+  - name: Job失败诊断
+    trigger: "Job状态为Failed"
+    steps:
+      - describe_job
+      - get_job_logs
+      - get_events

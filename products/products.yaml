@@ -1,0 +1,55 @@
+# K8s诊断Agent产品配置示例
+
+# 产品A配置
+product_a:
+  name: 产品A
+  namespace: product-a
+  description: 数据处理平台
+  
+  components:
+    # 容器化组件
+    deployments:
+      - name: api-server
+        description: API服务
+      - name: worker
+        description: 后台工作进程
+      - name: scheduler
+        description: 任务调度器
+    
+    # 数据库相关
+    statefulsets:
+      - name: mysql
+        description: MySQL数据库
+      - name: redis
+        description: Redis缓存
+    
+    # DBSql任务
+    dbsql_jobs:
+      - name: db-init
+        description: 数据库初始化
+      - name: db-migrate
+        description: 数据库迁移
+    
+    # No Container Jobs
+    no_container_jobs:
+      - name: config-loader
+        description: 配置加载器
+
+---
+
+# 产品B配置
+product_b:
+  name: 产品B
+  namespace: product-b
+  description: 用户管理系统
+  
+  components:
+    deployments:
+      - name: user-service
+        description: 用户服务
+      - name: auth-service
+        description: 认证服务
+    
+    dbsql_jobs:
+      - name: user-db-init
+        description: 用户库初始化
