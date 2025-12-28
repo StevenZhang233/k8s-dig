@@ -54,6 +54,10 @@ class AgentState(TypedDict):
     should_replan: bool
     iteration: int
     max_iterations: int
+    
+    # 反思 (Reflection)
+    reflection: Optional[Dict]  # 反思结果
+    reflection_count: int  # 反思次数
 
 
 # ==================== Prompt 模板 ====================
@@ -107,6 +111,42 @@ ANALYZER_PROMPT = """分析诊断命令的执行结果。
   "root_cause": "根因（如果找到）或null",
   "next_action": "continue/replan/conclude",
   "confidence": 0.8
+}}
+```
+"""
+
+REFLECTOR_PROMPT = """你是一个诊断质量评审专家。请反思当前的诊断过程，评估诊断质量并提出改进建议。
+
+## 原始问题
+{problem}
+
+## 诊断计划
+{plan_summary}
+
+## 执行步骤和结果
+{execution_summary}
+
+## 当前发现
+{findings}
+
+## 当前根因判断
+{root_cause}
+
+请从以下维度反思：
+1. **完整性**：诊断是否覆盖了所有可能的故障点？是否遗漏了关键检查？
+2. **准确性**：根因判断是否正确？是否有足够证据支撑？
+3. **深度**：是否需要进一步深入调查？
+4. **效率**：诊断步骤是否合理？有无冗余?
+
+输出JSON：
+```json
+{{
+  "quality_score": 8,
+  "completeness": "完整性评估",
+  "accuracy": "准确性评估", 
+  "suggestions": ["建议1", "建议2"],
+  "should_improve": true,
+  "improvement_focus": "需要改进的方向描述"
 }}
 ```
 """
@@ -190,6 +230,7 @@ class K8sDiagnosticAgent:
         workflow.add_node("planner", self._plan_node)
         workflow.add_node("executor", self._execute_node)
         workflow.add_node("analyzer", self._analyze_node)
+        workflow.add_node("reflector", self._reflect_node)  # 新增反思节点
         workflow.add_node("reporter", self._report_node)
         
         # 设置入口
@@ -205,12 +246,23 @@ class K8sDiagnosticAgent:
             {
                 "continue": "executor",
                 "replan": "planner",
-                "conclude": "reporter",
-                "max_reached": "reporter"
+                "conclude": "reflector",  # 改为先反思
+                "max_reached": "reflector"
             }
         )
         
         workflow.add_edge("executor", "analyzer")
+        
+        # 反思后决定是否需要改进
+        workflow.add_conditional_edges(
+            "reflector",
+            self._should_improve,
+            {
+                "improve": "planner",   # 需要改进则重新规划
+                "accept": "reporter"    # 接受则生成报告
+            }
+        )
+        
         workflow.add_edge("reporter", END)
         
         return workflow.compile()
@@ -354,6 +406,83 @@ class K8sDiagnosticAgent:
         
         return "continue"
     
+    async def _reflect_node(self, state: AgentState) -> Dict:
+        """反思节点：评估诊断质量并决定是否需要改进"""
+        # 构建计划摘要
+        plan_summary = "\n".join([
+            f"{i+1}. {s.tool}: {s.reason}" 
+            for i, s in enumerate(state.get("plan", []))
+        ]) or "无计划"
+        
+        # 构建执行摘要
+        execution_summary = "\n".join([
+            f"- {s.tool}: {s.result[:200] if s.result else '无结果'}..."
+            for s in state.get("plan", []) if s.status == "completed"
+        ]) or "无执行记录"
+        
+        findings = "\n".join(state.get("findings", [])) or "无发现"
+        root_cause = state.get("root_cause", "未确定")
+        
+        prompt = REFLECTOR_PROMPT.format(
+            problem=state["problem"],
+            plan_summary=plan_summary,
+            execution_summary=execution_summary,
+            findings=findings,
+            root_cause=root_cause
+        )
+        
+        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+        
+        # 解析反思结果
+        reflection = self._parse_reflection(response.content)
+        
+        logger.info(f"反思评分: {reflection.get('quality_score', 'N/A')}, "
+                   f"需要改进: {reflection.get('should_improve', False)}")
+        
+        return {
+            "reflection": reflection,
+            "reflection_count": state.get("reflection_count", 0) + 1,
+            "messages": [response]
+        }
+    
+    def _should_improve(self, state: AgentState) -> str:
+        """决定是否需要根据反思结果改进"""
+        reflection = state.get("reflection", {})
+        reflection_count = state.get("reflection_count", 0)
+        
+        # 最多反思2次，避免无限循环
+        if reflection_count >= 2:
+            logger.info("达到最大反思次数，接受当前结果")
+            return "accept"
+        
+        # 质量评分低于6分且建议改进
+        quality_score = reflection.get("quality_score", 10)
+        should_improve = reflection.get("should_improve", False)
+        
+        if quality_score < 6 and should_improve:
+            logger.info(f"质量评分 {quality_score} 较低，尝试改进")
+            return "improve"
+        
+        return "accept"
+    
+    def _parse_reflection(self, content: str) -> Dict:
+        """解析反思结果"""
+        import json
+        import re
+        
+        json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+        if json_match:
+            content = json_match.group(1)
+        
+        try:
+            return json.loads(content)
+        except:
+            return {
+                "quality_score": 7,
+                "should_improve": False,
+                "suggestions": []
+            }
+    
     def _parse_plan(self, content: str) -> List[DiagnosticStep]:
         """解析计划JSON"""
         import json
@@ -449,7 +578,9 @@ class K8sDiagnosticAgent:
             "final_report": None,
             "should_replan": False,
             "iteration": 0,
-            "max_iterations": self.config.get("agent", {}).get("max_iterations", 10)
+            "max_iterations": self.config.get("agent", {}).get("max_iterations", 10),
+            "reflection": None,
+            "reflection_count": 0
         }
         
         # 运行图
