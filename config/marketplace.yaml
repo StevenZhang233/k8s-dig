@@ -1,0 +1,58 @@
+# 产品市场 API 配置
+# 用于自动获取部署状态和错误信息
+
+marketplace:
+  # API 基础配置
+  api:
+    base_url: https://marketplace.internal.company.com/api/v1
+    auth_type: token  # token / oauth2 / basic
+    token: ${MARKETPLACE_API_TOKEN}
+    timeout: 30
+    
+  # 轮询配置（定时检查部署状态）
+  polling:
+    enabled: true
+    interval_seconds: 60  # 检查间隔
+    max_retries: 3
+    
+  # Webhook配置（实时接收部署事件）
+  webhook:
+    enabled: true
+    listen_port: 8080
+    secret: ${MARKETPLACE_WEBHOOK_SECRET}
+    
+  # 需要监控的部署状态
+  watch_statuses:
+    - DEPLOY_FAILED
+    - DEPLOY_TIMEOUT
+    - ROLLBACK_FAILED
+    - HEALTH_CHECK_FAILED
+    
+  # 自动诊断触发规则
+  auto_diagnosis:
+    enabled: true
+    # 触发条件
+    trigger_on:
+      - status: DEPLOY_FAILED
+        delay_seconds: 30  # 等待30秒后触发（避免瞬时错误）
+      - status: HEALTH_CHECK_FAILED
+        delay_seconds: 60
+    # 最大并发诊断数
+    max_concurrent: 5
+    
+# 环境映射：产品市场环境ID -> K8s集群配置
+environment_mapping:
+  prod-cluster-01:
+    name: 生产环境-集群1
+    master_ip: 10.0.1.100
+    kubeconfig: ~/.kube/config-prod-01
+    
+  prod-cluster-02:
+    name: 生产环境-集群2
+    master_ip: 10.0.2.100
+    kubeconfig: ~/.kube/config-prod-02
+    
+  staging-cluster:
+    name: 预发布环境
+    master_ip: 10.0.10.100
+    kubeconfig: ~/.kube/config-staging

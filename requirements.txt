@@ -20,3 +20,8 @@ gradio>=4.0.0
 
 # Utilities
 rich>=13.0.0
+httpx>=0.25.0
+
+# Webhook Service
+fastapi>=0.104.0
+uvicorn>=0.24.0
