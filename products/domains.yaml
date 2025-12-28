@@ -1,0 +1,83 @@
+# 产品领域配置
+# 每个领域可以有多个产品，每个产品可以有自己的skills和tools
+
+domains:
+  # ========== 平台领域 ==========
+  platform:
+    name: 平台
+    description: 平台相关产品
+    products:
+      - id: tke
+        name: 容器服务TKE
+        namespaces: ["tke-*"]
+        skills: skills/platform/tke.yaml
+        
+      - id: cvm
+        name: 云服务器CVM
+        namespaces: ["cvm-*"]
+        skills: skills/platform/cvm.yaml
+
+  # ========== 网络领域 ==========
+  network:
+    name: 网络
+    description: 网络相关产品
+    products:
+      - id: clb
+        name: 负载均衡CLB
+        namespaces: ["clb-*"]
+        skills: skills/network/clb.yaml
+        
+      - id: vpc
+        name: 私有网络VPC
+        namespaces: ["vpc-*"]
+        skills: skills/network/vpc.yaml
+
+  # ========== 数据库领域 ==========
+  database:
+    name: 数据库
+    description: 数据库相关产品
+    products:
+      - id: mysql
+        name: 云数据库MySQL
+        namespaces: ["mysql-*", "cdb-*"]
+        skills: skills/database/mysql.yaml
+        
+      - id: redis
+        name: 云数据库Redis
+        namespaces: ["redis-*"]
+        skills: skills/database/redis.yaml
+        
+      - id: mongodb
+        name: 云数据库MongoDB
+        namespaces: ["mongodb-*"]
+        skills: skills/database/mongodb.yaml
+
+  # ========== 中间件领域 ==========
+  middleware:
+    name: 中间件
+    description: 中间件相关产品
+    products:
+      - id: kafka
+        name: 消息队列Kafka
+        namespaces: ["kafka-*", "ckafka-*"]
+        skills: skills/middleware/kafka.yaml
+        
+      - id: rabbitmq
+        name: 消息队列RabbitMQ
+        namespaces: ["rabbitmq-*"]
+        skills: skills/middleware/rabbitmq.yaml
+
+  # ========== 计算领域 ==========
+  compute:
+    name: 计算
+    description: 计算相关产品
+    products:
+      - id: scf
+        name: 云函数SCF
+        namespaces: ["scf-*"]
+        skills: skills/compute/scf.yaml
+        
+      - id: batch
+        name: 批量计算
+        namespaces: ["batch-*"]
+        skills: skills/compute/batch.yaml

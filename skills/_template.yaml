@@ -1,0 +1,126 @@
+# ============================================================
+# Skills 模板文件
+# ============================================================
+# 
+# 使用说明：
+# 1. 复制此文件到对应产品目录，如: skills/database/mysql.yaml
+# 2. 修改 product_id 和 product_name
+# 3. 添加该产品特有的诊断技能
+# 4. 在 products/domains.yaml 中注册该产品
+#
+# ============================================================
+
+# 产品信息
+product_id: template          # 产品ID，需唯一
+product_name: 产品模板         # 产品显示名称
+version: "1.0.0"              # Skills版本
+
+# ============================================================
+# 技能定义
+# ============================================================
+skills:
+  # ----------------------------------------------------------
+  # 示例技能1：只读查询类
+  # ----------------------------------------------------------
+  - id: check_status                    # 技能ID，需唯一
+    name: 检查状态                       # 技能名称
+    description: 检查产品组件运行状态     # 技能描述（LLM会读取）
+    
+    # 关联的MCP工具或K8s命令
+    tool: list_pods                      # 使用的工具名
+    
+    # 参数定义
+    params:
+      namespace:
+        type: string
+        required: true
+        description: 目标namespace
+      label_selector:
+        type: string
+        required: false
+        description: 标签选择器
+        default: ""
+    
+    # 安全属性
+    safe: true                           # 是否安全（无副作用）
+    requires_confirmation: false         # 是否需要用户确认
+    
+    # 使用示例（帮助LLM理解何时使用）
+    examples:
+      - "检查MySQL实例状态"
+      - "查看数据库Pod是否正常运行"
+
+  # ----------------------------------------------------------
+  # 示例技能2：日志分析类
+  # ----------------------------------------------------------
+  - id: get_error_logs
+    name: 获取错误日志
+    description: 获取产品组件的错误日志，用于排查故障
+    tool: get_pod_logs
+    params:
+      namespace:
+        type: string
+        required: true
+      pod_name:
+        type: string
+        required: true
+      tail_lines:
+        type: integer
+        required: false
+        default: 100
+      grep_pattern:
+        type: string
+        required: false
+        description: 过滤关键字，如 ERROR, WARN
+    safe: true
+    requires_confirmation: false
+    examples:
+      - "查看MySQL pod的错误日志"
+      - "获取最近100行日志"
+
+  # ----------------------------------------------------------
+  # 示例技能3：执行命令类（需确认）
+  # ----------------------------------------------------------
+  - id: restart_component
+    name: 重启组件
+    description: 重启产品组件（会删除Pod触发重建）
+    tool: restart_pod
+    params:
+      namespace:
+        type: string
+        required: true
+      pod_name:
+        type: string
+        required: true
+    safe: false                         # 有副作用
+    requires_confirmation: true         # 需要用户确认
+    examples:
+      - "重启MySQL主节点"
+      - "重启挂起的组件"
+
+# ============================================================
+# 诊断策略（可选）
+# 定义针对常见问题的诊断流程
+# ============================================================
+diagnostic_strategies:
+  - id: connection_failure
+    name: 连接失败排查
+    description: 当产品连接失败时的排查流程
+    steps:
+      - skill: check_status
+        reason: 首先检查组件是否正常运行
+      - skill: get_error_logs
+        reason: 查看日志确认具体错误
+        params:
+          grep_pattern: "connection|timeout|refused"
+
+  - id: performance_issue
+    name: 性能问题排查
+    description: 当产品响应慢时的排查流程
+    steps:
+      - skill: check_status
+        reason: 检查资源使用情况
+      - skill: get_error_logs
+        reason: 查看是否有性能相关警告
+        params:
+          grep_pattern: "slow|timeout|memory|cpu"
